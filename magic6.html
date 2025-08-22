@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Magic Addition • Ending in 6 (Shift +4/−4)</title>
+  <style>
+    :root{ --bg:#0b1020; --ink:#e8eeff; --muted:#9fb1ff; --accent:#6ae3ff; --accent2:#7bff95; --warn:#ff7b9b; --good:#22e39a }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Inter,system-ui,Segoe UI,Arial;background:radial-gradient(1200px 600px at 20% -10%, #15204f 0%, #0b1020 40%),radial-gradient(900px 500px at 120% 0%, #112347 0%, #0b1020 40%),var(--bg);color:var(--ink)}
+    .wrap{max-width:900px;margin:24px auto;padding:20px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .title{font-size:20px;font-weight:700}
+    .board{background:linear-gradient(180deg,#0f1739,#0f1633);border:1px solid #243060;border-radius:20px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.05)}
+    .status{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+    .stat{background:#0b1333;border:1px solid #22306b;border-radius:10px;padding:8px 10px;font-size:12px;color:var(--muted)}
+    .stat b{color:var(--ink)}
+    .progress{height:10px;background:#0b1333;border:1px solid #22306b;border-radius:999px;overflow:hidden}
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,#7bff95,#6ae3ff);transition:width .2s}
+    .row{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px}
+    .panel{flex:1 1 300px;background:rgba(255,255,255,.02);border:1px solid #243060;border-radius:16px;padding:16px}
+    h3{margin:0 0 12px;font-size:16px;color:var(--muted)}
+    .equation{display:flex;align-items:center;justify-content:center;gap:12px;font-size:48px;font-weight:800;padding:12px 10px;border-radius:14px;background:#0b1333;border:1px solid #22306b}
+    .badge{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid #2c3b7a;color:var(--muted);background:rgba(255,255,255,.03)}
+    .shiftBtns{display:flex;gap:10px;justify-content:center;margin-top:10px}
+    .btn{border:0;border-radius:12px;padding:10px 14px;font-weight:700;cursor:pointer;background:#1a2760;color:var(--ink);transition:transform .08s ease}
+    .btn:active{transform:scale(.98)} .btn.acc{background:linear-gradient(90deg,#3fa9ff,#6ae3ff)} .btn.warn{background:linear-gradient(90deg,#ff7b9b,#ffb1a9)} .btn.ghost{background:transparent;border:1px solid #2b3b7a;color:var(--muted)}
+    .choices{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+    .choice{background:#101b46;border:2px solid #22306b;border-radius:14px;padding:18px;font-size:24px;font-weight:900;cursor:pointer;text-align:center;color:var(--ink);transition:transform .08s ease,border-color .2s}
+    .choice:hover{transform:translateY(-2px);border-color:#3a55aa}
+    .choice.correct{border-color:var(--good);box-shadow:0 0 0 2px rgba(34,227,154,.2) inset;background:#153b2f}
+    .choice.wrong{border-color:var(--warn);box-shadow:0 0 0 2px rgba(255,123,155,.25) inset;background:#3b1a2a}
+    .explain{background:#0b1333;border:1px solid #22306b;border-radius:14px;padding:12px;margin-top:12px;font-size:14px;line-height:1.5}
+    .ex-step{display:flex;gap:8px;align-items:flex-start;margin:6px 0}
+    .ex-step .dot{width:8px;height:8px;background:var(--accent);border-radius:50%;margin-top:6px}
+    .confetti{position:fixed;inset:0;pointer-events:none}
+    .confetti .p{position:absolute;width:6px;height:10px;background:currentColor;top:-10px;opacity:.9}
+    @media (max-width:600px){.equation{font-size:36px}.choice{font-size:20px;padding:14px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="title">Magic Addition • Ends in <b>6</b> → shift <b>+4/−4</b></div>
+      <div class="modeBtns">
+        <button class="btn ghost" id="modeLearn">Learn</button>
+        <button class="btn acc" id="modeSpeed">Speed Run 60s</button>
+      </div>
+    </header>
+    <div class="board">
+      <div class="status">
+        <div class="stat">Score: <b id="score">0</b></div>
+        <div class="stat">Streak: <b id="streak">0</b></div>
+        <div class="stat">Time: <b id="timeLeft">∞</b></div>
+        <div class="stat">Mode: <b id="modeLabel">Learn</b></div>
+      </div>
+      <div class="progress"><div class="bar" id="progressBar"></div></div>
+      <div class="row">
+        <div class="panel">
+          <h3>Problem</h3>
+          <div class="equation" id="eq"></div>
+          <div class="shiftBtns">
+            <button class="btn" id="hintBtn">Show Magic Shift</button>
+            <button class="btn warn" id="skipBtn">Skip</button>
+          </div>
+          <div class="choices" id="choices"></div>
+        </div>
+        <div class="panel">
+          <h3>Visual Explain</h3>
+          <div class="explain" id="explainBox">Rule: if a number ends in <b>6</b>, add <b>4</b> to it and subtract <b>4</b> from the other number. Then add — same total, simpler mental math.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="confetti" id="confetti"></div>
+  <script>
+    const TARGET=6, DIFF=4;
+    const rnd=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+    const endsTarget=n=>n%10===TARGET;
+    function makeProblem(){ 
+      let a=rnd(TARGET,98); 
+      while(!endsTarget(a)) a=rnd(TARGET,98); 
+      let b=rnd(5,94); 
+      return [a,b]; 
+    }
+    function choiceSet(ans){ const s=new Set([ans]); while(s.size<4){ s.add(ans + rnd(-9,9)); } return Array.from(s).sort(()=>Math.random()-0.5); }
+    let score=0, streak=0, timer=null, timeLeft=Infinity, mode='learn', question=1, totalQs=15; let A=0,B=0,ANS=0;
+    const eq=document.getElementById('eq'), choices=document.getElementById('choices'), scoreEl=document.getElementById('score'), streakEl=document.getElementById('streak'), timeEl=document.getElementById('timeLeft'), modeLabel=document.getElementById('modeLabel'), progressBar=document.getElementById('progressBar'), explainBox=document.getElementById('explainBox');
+    function renderProblem(){ [A,B]=makeProblem(); ANS=A+B; eq.innerHTML=`<span class="badge">Q${question}</span> <span>${A}</span> <span>+</span> <span>${B}</span>`; choices.innerHTML=''; choiceSet(ANS).forEach(v=>{ const c=document.createElement('button'); c.className='choice'; c.textContent=v; c.onclick=()=>selectChoice(c,v); choices.appendChild(c); }); document.getElementById('hintBtn').disabled=false; progressBar.style.width=`${(question-1)/totalQs*100}%`; }
+    function selectChoice(node,val){ Array.from(document.querySelectorAll('.choice')).forEach(ch=>ch.disabled=true); const ok=val===ANS; node.classList.add(ok?'correct':'wrong'); if(ok){score+=10; streak+=1; confettiBurst();} else {streak=0;} scoreEl.textContent=score; streakEl.textContent=streak; nextStep(); }
+    function showShift(){ const pickA=endsTarget(A)?A:(endsTarget(B)?B:null); const pickB=(pickA===A)?B:(pickA===B?A:null); if(pickA==null){ explainBox.innerHTML=`No 6 spotted (rare here). Exact sum is <b>${ANS}</b>.`; return; } const up=pickA+DIFF, down=pickB-DIFF; const aLabel=pickA===A?'first':'second', bLabel=pickA===A?'second':'first'; explainBox.innerHTML=`<div class='ex-step'><div class='dot'></div><div><b>Spot:</b> ${aLabel} number ends with 6 → it's <b>${DIFF}</b> from a clean 10.</div></div><div class='ex-step'><div class='dot'></div><div><b>Shift:</b> Add <b>${DIFF}</b> to ${pickA} → <b>${up}</b>. Subtract <b>${DIFF}</b> from the ${bLabel} number → <b>${down}</b>.</div></div><div class='ex-step'><div class='dot'></div><div><b>Add:</b> ${up} + ${down} = <b>${ANS}</b>.</div></div>`; document.getElementById('hintBtn').disabled=true; eq.animate([{transform:'scale(1)'},{transform:'scale(1.03)'},{transform:'scale(1)'}],{duration:400}); }
+    function nextStep(){ setTimeout(()=>{ question++; if(mode==='speed'&& !isFinite(timeLeft)) return; if(question>totalQs && mode==='learn'){ finishRound(); } else { renderProblem(); } },400); }
+    function finishRound(){ choices.innerHTML=''; eq.innerHTML=`<span class='badge'>Done</span> <span style='font-size:28px'>Score: ${score}</span>`; explainBox.innerHTML=`Nice run. <b>${score}</b> points.`; progressBar.style.width='100%'; }
+    function setMode(m){ clearInterval(timer); timer=null; timeLeft=(m==='speed')?60:Infinity; timeEl.textContent=isFinite(timeLeft)?timeLeft:'∞'; mode=m; modeLabel.textContent=(m==='speed')?'Speed Run':'Learn'; question=1; score=0; streak=0; scoreEl.textContent=0; streakEl.textContent=0; progressBar.style.width='0%'; totalQs=(m==='speed')?9999:15; renderProblem(); if(m==='speed') startTimer(); }
+    function startTimer(){ timer=setInterval(()=>{ if(!isFinite(timeLeft)) return; timeLeft-=1; timeEl.textContent=timeLeft; if(timeLeft<=0){ clearInterval(timer); timer=null; timeEl.textContent='0'; finishRound(); } },1000); }
+    function confettiBurst(){ const root=document.getElementById('confetti'); for(let i=0;i<18;i++){ const p=document.createElement('div'); p.className='p'; p.style.left=(Math.floor(Math.random()*81)+10)+'%'; p.style.color=['#7bff95','#6ae3ff','#ffb1a9','#ffd56a'][Math.floor(Math.random()*4)]; const fall=Math.floor(Math.random()*501)+600; p.animate([{transform:'translateY(0) rotate(0deg)'},{transform:`translateY(100vh) rotate(${Math.floor(Math.random()*361)+180}deg)`}],{duration:fall,easing:'cubic-bezier(.15,.55,.25,1)',fill:'both'}); document.getElementById('confetti').appendChild(p); setTimeout(()=>p.remove(),fall+50);} }
+    document.getElementById('hintBtn').addEventListener('click',showShift);
+    document.getElementById('skipBtn').addEventListener('click',()=>{streak=0;streakEl.textContent=0;nextStep()});
+    document.getElementById('modeLearn').addEventListener('click',()=>setMode('learn'));
+    document.getElementById('modeSpeed').addEventListener('click',()=>setMode('speed'));
+    setMode('learn');
+  </script>
+  <div class="confetti" id="confetti"></div>
+</body>
+</html>
