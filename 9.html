@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Magic 9 Math Quiz</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f7faff; margin: 0; }
+    .container { max-width: 800px; margin: 30px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px #bbb; padding: 32px; }
+    h2 { text-align: center; }
+    .question { font-size: 1.18em; margin-bottom: 12px; }
+    .options label {
+      display: block; padding: 10px 16px; background: #eee; margin-bottom: 10px; border-radius: 8px;
+      border: 2px solid transparent; transition: background 0.2s, border 0.2s;
+      cursor: pointer;
+    }
+    .options input[type="radio"] { display: none; }
+    .options input[type="radio"]:checked+label { background: #D6ECFF; border: 2px solid #2181db;}
+    .options label.correct  { background: #c7f7c2 !important; border: 2px solid #3bb339; color: #1b6011;}
+    .options label.incorrect{ background: #ffcccc !important; border: 2px solid #e22222; color: #b20000;}
+    .options label.notchosen{ color: #888;}
+    .options label.disabled { pointer-events: none; opacity: 0.7;}
+    .disabled, .options.disabled label { pointer-events: none; background: #ddd !important; }
+    .nav { display: flex; justify-content: space-between; margin: 18px 0 10px;}
+    .score, .done { font-size: 1.13em; padding: 14px; background: #e6ffe6; border-radius: 8px; text-align: center; }
+    .btn { font-size: 1em; padding: 8px 22px; margin: 8px; background: #0a98dd; border: none; border-radius: 6px; color: #fff; cursor: pointer; }
+    .btn:disabled { background: #aaa; cursor: default; }
+    .progress { text-align: center; margin-bottom: 12px; }
+    .timer { text-align: center; font-size: 1.1em; margin: 10px 0 8px; color: #0a98dd;}
+    .start-screen { text-align: center; margin: 60px auto; }
+    .start-screen button { font-size: 1.2em; padding: 16px 50px; background: #3cb371; border: none; border-radius: 10px; color: #fff; cursor: pointer; }
+    .footer-count { text-align: center; color: #444; font-size: 1.05em; margin-top: 28px; padding-top: 5px; }
+    .resblock { background: #e6ffe6; border-radius: 10px; margin: 0 auto 22px; padding: 18px 5px; max-width:470px; text-align: center; font-size:1.25em;}
+    table.result-table { width:100%; border-collapse: collapse; margin-top: 19px;}
+    table.result-table th,table.result-table td{border:1px solid #bbb; padding:5px 7px;text-align:center;}
+    table.result-table th { background: #f0f5ff;}
+    .success { color: #15660c; font-weight: bold;}
+    .good { color: #2675c2; font-weight: bold;}
+    .chart-wrap { background: #fafaff; border-radius: 8px; margin:17px 0; padding:14px;}
+  </style>
+</head>
+<body>
+<div class="container" id="app"></div>
+<script>
+let timerInterval = null, startTime = 0, elapsedTime = 0, pausedAt = 0;
+let footerCountdown = 0, footerInterval = null;
+let waitingForNext = false, waitingAutoAdv = false;
+function formatSeconds(sec) { let m = Math.floor(sec / 60); let s = sec % 60;
+  return \
+`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;}
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min;}
+function shuffle(arr) { for(let i = arr.length-1; i > 0; --i) {
+  let j = Math.floor(Math.random() * (i+1)); [arr[i], arr[j]] = [arr[j], arr[i]];} return arr;}
+function makeDirectQuestion(type) {
+  let n1, n2, text, correct;
+  switch(type) {
+    case "nn+9": n1 = randInt(10, 99); n2 = 9; correct = n1 + n2; text = `What is ${n1} + 9?`; break;
+    case "n9+n": n1 = randInt(1, 9)*10 + 9; n2 = randInt(2, 29); correct = n1 + n2; text = `What is ${n1} + ${n2}?`; break;
+    case "n9+9": n1 = randInt(1, 9)*10 + 9; n2 = 9; correct = n1 + n2; text = `What is ${n1} + 9?`; break;
+    case "n+n9": n1 = randInt(2, 29); n2 = randInt(1, 9)*10 + 9; correct = n1 + n2; text = `What is ${n1} + ${n2}?`; break;
+    case "n9+n9": n1 = randInt(1, 9)*10 + 9; n2 = randInt(1, 9)*10 + 9; while(n1 === n2) n2 = randInt(1, 9)*10 + 9; correct = n1 + n2; text = `What is ${n1} + ${n2}?`; break;
+  }
+  let choices = [correct, correct+1, correct-1, correct+randInt(2, 4)];
+  choices = Array.from(new Set(choices)); while(choices.length < 4) choices.push(correct+randInt(-5, 5)); choices = shuffle(choices).slice(0,4);
+  return { text, choices, correct, type: "number" };
+}
+const names = [["Ram", "Shyam"],["Jane", "Tim"],["Siti","Ali"],["Devi","Raju"],["Mia","Liam"],["Sara","Luca"]];
+function makeWordProblem(type) {
+  let nmidx = randInt(0, names.length-1); let [name1, name2] = names[nmidx];
+  let n1, n2, correct, text;
+  switch(type) {
+    case "nn+9": n1 = randInt(10, 99); n2 = 9; correct = n1 + n2; text = `${name1} had ${n1} marbles and ${name2} had 9 marbles. How many marbles did they have altogether?`; break;
+    case "n9+n": n1 = randInt(1, 9)*10 + 9; n2 = randInt(2, 29); correct = n1 + n2; text = `${name1} had ${n1} apples and ${name2} had ${n2} apples. What is the total number of apples?`; break;
+    case "n9+9": n1 = randInt(1, 9)*10 + 9; n2 = 9; correct = n1 + n2; text = `${name1} had ${n1} candies and ${name2} had 9 candies. How many candies do they have in total?`; break;
+    case "n+n9": n1 = randInt(2,29); n2 = randInt(1,9)*10+9; correct = n1 + n2; text = `${name1} found ${n1} shells and ${name2} found ${n2} shells on the beach. How many shells did they find altogether?`; break;
+    case "n9+n9": n1 = randInt(1,9)*10+9; n2 = randInt(1,9)*10+9; while(n1===n2) n2 = randInt(1,9)*10+9; correct = n1+n2; text = `${name1} had ${n1} stickers and ${name2} had ${n2} stickers. How many stickers in total?`; break;
+  }
+  let choices = [correct, correct+1, correct-1, correct+randInt(2,4)];
+  choices = Array.from(new Set(choices)); while(choices.length < 4) choices.push(correct+randInt(-5, 5)); choices = shuffle(choices).slice(0,4);
+  return { text, choices, correct, type: "english" };
+}
+function buildFullQuiz(directQ=20, wordQ=10) {
+  let types = ["nn+9", "n9+n", "n9+9", "n+n9", "n9+n9"]; 
+  let q1 = [], c = Array(types.length).fill(Math.ceil(directQ/types.length));
+  while(q1.length < directQ) { let tOrder = shuffle(types.slice());
+    for(let i=0; i<types.length && q1.length<directQ; ++i) if(c[i]>0){ q1.push(makeDirectQuestion(types[i])); c[i]--;}}
+  let q2=[],d=Array(types.length).fill(Math.ceil(wordQ/types.length));
+  while(q2.length<wordQ){ let t=shuffle(types.slice()); for(let i=0;i<types.length&&q2.length<wordQ;++i) if(d[i]>0){q2.push(makeWordProblem(types[i]));d[i]--;}}
+  return q1.concat(q2);
+}
+let questions = [], state = {}, current = 0, quizStarted = false, quizFinished = false;
+let questionTimes = [], currentQStart = 0, showingResults = false;
+function renderStartScreen() {
+  document.getElementById('app').innerHTML = `
+    <div class="start-screen">
+      <h2>Singapore Math<br>Magic 9 Quiz</h2>
+      <div style="font-size:1.19em;margin:25px auto;max-width:530px;">
+        20 number questions (2 marks each)<br>
+        10 English math questions (3 marks each)<br>
+        No change after submit.<br><br>
+        <b>Score/analysis at end. Try your best!</b>
+      </div>
+      <button onclick="startQuiz()">Start</button>
+    </div>`;
+}
+window.startQuiz = function() {
+  questions = buildFullQuiz();
+  state = {
+    answer: Array(questions.length).fill(null),
+    submitted: Array(questions.length).fill(false)
+  };
+  current = 0; elapsedTime = 0; quizFinished = false; quizStarted = true; waitingForNext = false; waitingAutoAdv = false;
+  questionTimes = Array(questions.length).fill(null); showingResults = false;
+  timerStart(); currentQStart = Date.now(); renderQuiz();
+}
+function timerTick() { if(!waitingForNext) elapsedTime = Math.floor((Date.now()-startTime)/1000); renderTimer();}
+function timerStart() { startTime = Date.now() - elapsedTime*1000; timerInterval = setInterval(timerTick, 1000); renderTimer(); }
+function timerStop() { clearInterval(timerInterval;)}
+function pauseTimer() { if(!waitingForNext) { waitingForNext = true; pausedAt = Date.now(); } }
+function resumeTimer() {
+  if(waitingForNext) {
+    elapsedTime += Math.floor((Date.now()-pausedAt)/1000);
+    startTime = Date.now() - elapsedTime*1000;
+    currentQStart = Date.now();
+    waitingForNext = false;
+  }
+}
+function renderTimer() { let t=document.getElementById('timerPlace'); if(t) t.innerHTML=`<span class="timer"><b>Timer:</b> ${formatSeconds(elapsedTime)}</span>`;}
+function advanceAfterDelay(endQuiz) {
+  let n=5; footerCountdown=n; waitingAutoAdv = true;
+  let f=document.getElementById('footerPlace');
+  if(f) f.innerHTML=`<div class="footer-count">Going to results${endQuiz?'':'/next question'} in <b>${footerCountdown}</b> seconds...</div>`;
+  pauseTimer();
+  footerInterval=setInterval(()=>{
+    footerCountdown--;
+    if(f) f.innerHTML = `<div class="footer-count">Going to results${endQuiz?'':'/next question'} in <b>${footerCountdown}</b> seconds...</div>`;
+    if(footerCountdown<=0){
+      if (!waitingAutoAdv) return;
+      waitingAutoAdv = false;
+      clearInterval(footerInterval);
+      footerCountdown=0;
+      if(endQuiz) showResults(); else goNext(true, true);
+    }
+  },1000);
+}
+function renderQuiz() {
+  if(showingResults) return renderResults();
+  let qp = questions[current];
+  let section = current < 20 ? `<div class="progress" style="color:#137b1c;">Section 1: Direct Number Sums</div>`:`<div class="progress" style="color:#2352ba;">Section 2: English Math Questions</div>`;
+  let out = section;
+  out += `<div class="progress">Question ${current+1} of ${questions.length}<br>
+  <progress value="${current+1}" max="${questions.length}"></progress></div>`;
+  out += `<div id="timerPlace"></div>`;
+  out += `<div class="question"><b>Q${current+1}.</b> ${qp.text}</div>`;
+  out += `<form class="options" id="optionForm">`;
+  for(let i=0;i<4;++i){
+    let val = qp.choices[i], checked = (state.answer[current]===val)?'checked':'', disabled='', cls='';
+    if(state.submitted[current]) {
+      disabled='disabled';
+      if(val===qp.correct) cls='correct';
+      else if(state.answer[current]===val) cls='incorrect';
+      else cls='notchosen';
+    }
+    out+=`<div>
+    <input type="radio" name="choice" id="opt${i}" value="${val}" ${checked} ${disabled}>
+    <label for="opt${i}" class="${cls} ${disabled?'disabled':''}">${val}</label>
+    </div>`;
+  }
+  out+='</form>';
+  let submitDisabled = state.answer[current]==null || state.submitted[current];
+  let nextDisabled = !state.submitted[current] || current===questions.length-1;
+  let prevDisabled = current===0 || waitingForNext;
+  out+=`<div class="nav">
+  <button class="btn" onclick="goPrev()" ${prevDisabled?'disabled':''}>&larr; Prev</button>
+  <button class="btn" onclick="submitAnswer()" ${submitDisabled?'disabled':''}>Submit</button>
+  <button class="btn" onclick="goNext()" ${nextDisabled?'disabled':''}>Next &rarr;</button>
+  </div>`;
+  out += `<div style="text-align:center; margin-top:2px;">
+    <span>Answered: ${state.submitted.filter(b=>b).length} / ${questions.length}</span>
+  </div>
+  <div id="footerPlace"></div>`;
+  document.getElementById('app').innerHTML = out; renderTimer();
+  Array.from(document.querySelectorAll('input[type=radio][name=choice]')).forEach(inp=>{
+    inp.addEventListener('change',function(){
+      if(!state.submitted[current] && !waitingForNext){
+        state.answer[current]=parseInt(this.value,10);renderQuiz();
+      }
+    });
+  });
+}
+window.goPrev = function(){
+  if(waitingForNext) return;
+  if(current>0){current--;currentQStart=Date.now();renderQuiz();}
+}
+window.goNext = function(force,autoTriggered){
+  if(!state.submitted[current] || current===questions.length-1) return;
+  if(waitingForNext || waitingAutoAdv){
+    if(footerInterval) clearInterval(footerInterval);
+    waitingForNext = false; waitingAutoAdv = false; footerCountdown = 0;
+    resumeTimer();
+  }
+  current++;currentQStart=Date.now();renderQuiz();
+}
+window.submitAnswer = function(){
+  if(waitingForNext) return;
+  if(state.answer[current]==null || state.submitted[current]) return;
+  state.submitted[current]=true;
+  let t = ((Date.now() - currentQStart)/1000); questionTimes[current]=t;
+  let endQuiz = state.submitted.every(s=>s);
+  renderQuiz();advanceAfterDelay(endQuiz);
+}
+function showResults() { quizFinished=true; timerStop(); showingResults=true; renderResults();}
+function renderResults() {
+  let nNum=0, nEng=0, markNum=0, markEng=0, timeNum=0, timeEng=0;
+  for(let i=0;i<questions.length;++i){
+    if(questions[i].type == "number") {
+      markNum += (state.answer[i]===questions[i].correct)?2:0; nNum++; if(questionTimes[i]) timeNum+=questionTimes[i];
+    } else {
+      markEng += (state.answer[i]===questions[i].correct)?3:0; nEng++; if(questionTimes[i]) timeEng+=questionTimes[i];
+    }
+  }
+  let totalScore = markNum + markEng;
+  let totalMarks = nNum*2 + nEng*3;
+  let avgNum = nNum? (timeNum/nNum) : 0, avgEng = nEng? (timeEng/nEng) : 0;
+  let perc = Math.round(100*totalScore/totalMarks);
+  let comment = '';
+  if(perc>=90) comment = '<span class="success">Excellent!</span>';
+  else if(perc>=70) comment = '<span class="good">Very Good!</span>';
+  let out = `<div class="resblock">
+    <div style="font-size:1.18em;"><b>Test Completed</b></div>
+    <div>Your Score: <b>${totalScore} / ${totalMarks} marks</b></div>
+    <div>Number Q Avg: <b>${avgNum.toFixed(1)}</b> sec/question &nbsp;|&nbsp; English Q Avg: <b>${avgEng.toFixed(1)}</b> sec/question</div>
+    <div>Total Time: <b>${formatSeconds(elapsedTime)}</b></div>
+    <div style="margin-top:5px;">${comment}</div>
+  </div>`;
+  out += renderTimeChart();
+  out += `<table class="result-table"><tr>
+    <th style="width:30px;">#</th><th>Question</th>
+    <th>Your Ans</th><th>Correct</th><th>Time (s)</th><th>Type</th></tr>`;
+  for(let i=0;i<questions.length;++i){
+    let corr = questions[i].correct, you = state.answer[i]==null?'':state.answer[i];
+    let style = you==corr?'background:#dbffe3;':'background:#ffe6e6;';
+    out += `<tr style="${style}"><td>${i+1}</td>
+      <td style="text-align:left;">${questions[i].text}</td>
+      <td>${you}</td><td>${corr}</td><td>${questionTimes[i]?questionTimes[i].toFixed(1):''}</td>
+      <td>${questions[i].type=="number"?"Number":"English"}</td></tr>`;
+  }
+  out += `</table>
+  <div style="margin: 20px 0; text-align:center;">
+    <button class="btn" onclick="startQuiz()">Try Again</button>
+  </div>`;
+  document.getElementById('app').innerHTML = out;
+}
+
+// Improved, aligned SVG chart
+function renderTimeChart() {
+  let w = 420, h = 130, N = questionTimes.length;
+  let marginLeft = 50, marginRight = 25, marginBottom = 35, marginTop = 20;
+  let maxTime = Math.max(...questionTimes, 10, 2);
+  let minTime = Math.min(...questionTimes, 0);
+  if(maxTime-minTime < 2) maxTime = minTime+2;
+  let yForVal = t => marginTop + (h-marginTop-marginBottom) * (1 - (t-minTime)/(maxTime-minTime));
+  let xForQ = i => marginLeft + (w - marginLeft - marginRight)* (N===1?0.5 : i/(N-1));
+  let step = (maxTime-minTime>10)?2:1;
+  let yTics = [];
+  for(let t=Math.ceil(minTime); t<=maxTime; t+=step) {
+    let y = yForVal(t);
+    yTics.push(`<line x1="${marginLeft-4}" y1="${y}" x2="${marginLeft}" y2="${y}" stroke="#aaa" stroke-width="1"/>`+
+      `<text x="${marginLeft-8}" y="${y+3}" text-anchor="end" font-size="11" fill="#666">${t}</text>`);
+  }
+  let pts = [];
+  for(let i=0;i<N;++i)
+      pts.push(`${xForQ(i)},${yForVal(questionTimes[i])}`);
+  let polyline = `<polyline points="${pts.join(' ')}" fill="none" stroke="#2181db" stroke-width="2"/>`;
+  let dots = questionTimes.map((t,i)=>`<circle cx="${xForQ(i)}" cy="${yForVal(t)}" r="4" fill="#057" />`).join('');
+  let vals = questionTimes.map((t,i)=>
+      `<text x='${xForQ(i)}' y='${yForVal(t)-12}' font-size='11' text-anchor='middle' fill='#057'>${t.toFixed(1)}</text>`
+    ).join('');
+  let qLabels = questionTimes.map((_,i)=>`<text x="${xForQ(i)}" y="${h-marginBottom+14}" text-anchor="middle" font-size="12">${i+1}</text>`).join('');
+  let axis = `
+    <line x1="${marginLeft}" y1="${h-marginBottom}" x2="${w-marginRight}" y2="${h-marginBottom}" stroke="#888" stroke-width="1.3"/>
+    <line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${h-marginBottom}" stroke="#888" stroke-width="1.3"/>
+    ${yTics.join('\n')}
+    ${qLabels}
+    <text x="${marginLeft+(w-marginLeft-marginRight)/2}" y="${h-4}" text-anchor="middle" fill="#888" font-size="12">Question Number</text>
+    <text x="12" y="${marginTop+10}" font-size="12" fill="#888" text-anchor="start">Sec</text>
+    <text x="${w/2}" y="15" text-anchor="middle" font-size="13" fill="#444">Time (s) per Question</text>
+  `;
+  return `<div class="chart-wrap"><svg width="${w}" height="${h}">
+    <rect x="0" y="0" width="${w}" height="${h}" fill="#fafaff"/>
+    ${axis}${polyline}${dots}${vals}
+  </svg></div>`;
+}
+renderStartScreen();
+</script>
+</body>
+</html>
